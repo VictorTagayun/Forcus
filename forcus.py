@@ -4,8 +4,8 @@ import asyncio
 from supervisor import Supervisor
 from Common.woc import WOC
 
-FOCUS_TIME = 300
-SEARCH_FACE_TIMEOUT = 30
+FOCUS_TIME = 600
+SEARCH_FACE_TIMEOUT = 5
 FRAME_DROP = 5
 
 class ForcedFocus(WOC):
@@ -27,8 +27,9 @@ class ForcedFocus(WOC):
         robot.move_lift(-3)
         # robot.set_head_angle(cozmo.robot.MAX_HEAD_ANGLE)
         robot.world.add_event_handler(cozmo.faces.EvtFaceObserved, self.onFaceObserved)
+        robot.world.add_event_handler(cozmo.faces.EvtFaceAppeared, self.onFaceAppeared)
+        robot.world.add_event_handler(cozmo.faces.EvtFaceDisappeared, self.onFaceDisappeared)
         await self._supervisor.startStare()
-        # await robot.set_head_angle(cozmo.util.Angle(0))
         
         while not self.exit_flag:
             if self._face and self._face.is_visible:
@@ -41,8 +42,9 @@ class ForcedFocus(WOC):
                     self.curr_time += SEARCH_FACE_TIMEOUT
                     print("Fail to find a face")
             
-            await asyncio.sleep(0.1)
-            self.curr_time += 0.1
+            await asyncio.sleep(0.5)
+            await self._supervisor.regularCheck()
+            self.curr_time += 0.5
             if self.curr_time > self.focus_time:
                 break
 
@@ -56,14 +58,14 @@ class ForcedFocus(WOC):
         self._prevPose = evt.pose
         
         if self._supervisor:
-            await self._supervisor.seeFacePosition(evt.pose.position)
+            await self._supervisor.seeFacePosition(evt.pose.position, evt.face)
         #print(obj.pose)
 
     async def onFaceAppeared(self, evt: cozmo.faces.EvtFaceAppeared, obj=None, **kwargs):
-        pass
+        await self._supervisor.seeFace(evt.pose.position, evt.face)
 
-    async def onFaceDisappeared(self, evt: cozmo.faces.EvtFaceAppeared, obj=None, **kwargs):
-        pass
+    async def onFaceDisappeared(self, evt: cozmo.faces.EvtFaceDisappeared, obj=None, **kwargs):
+        await self._supervisor.clearFace(evt.face)
 
 if __name__ == '__main__':
     ForcedFocus(FOCUS_TIME)
