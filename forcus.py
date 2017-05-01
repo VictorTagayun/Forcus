@@ -4,7 +4,8 @@ import asyncio
 from supervisor import Supervisor
 from Common.woc import WOC
 
-FOCUS_TIME = 600
+# total time the human want to focus on something
+FOCUS_TIME = 60 * 12
 SEARCH_FACE_TIMEOUT = 5
 FRAME_DROP = 5
 
@@ -37,6 +38,7 @@ class ForcedFocus(WOC):
                 pass
             else:
                 try:
+                    # find a human face
                     self._face = await robot.world.wait_for_observed_face(timeout=SEARCH_FACE_TIMEOUT)
                 except asyncio.TimeoutError:
                     self.curr_time += SEARCH_FACE_TIMEOUT
@@ -50,16 +52,15 @@ class ForcedFocus(WOC):
 
     async def onFaceObserved(self, evt: cozmo.faces.EvtFaceObserved, obj=None, **kwargs):
         poseDiff = None
-        #print("-----------current-------")
-        #print(evt.pose)
         if self._prevPose:
             poseDiff = evt.pose - self._prevPose
             positionDiff = evt.pose.position - self._prevPose.position
+        # update face pose
         self._prevPose = evt.pose
         
+        # update the face position with supervisor
         if self._supervisor:
             await self._supervisor.seeFacePosition(evt.pose.position, evt.face)
-        #print(obj.pose)
 
     async def onFaceAppeared(self, evt: cozmo.faces.EvtFaceAppeared, obj=None, **kwargs):
         await self._supervisor.seeFace(evt.pose.position, evt.face)

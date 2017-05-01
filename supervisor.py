@@ -4,10 +4,13 @@ import time
 import random
 import Common.wocmath
 
+# squared distance threshold for head motion distance for distraction judgement
 DISTRACTION_DISTANCE2_THRS = 15000
+# ignore slight head motion
 MOTION_ERROR_THRS = 1000
 UPDATING_FACTOR = 0.1
 FORGIVE_THRS = 100
+# grace number of distractions to level up angriness
 ANGRY_SCALE = [0, 3, 6, 9, 99999]
 
 WORDS = [["Hey", "Oh, no", "Huh"],
@@ -31,19 +34,22 @@ class Supervisor:
         self._trackingFace = None
         self._forgiveness = 0
 
+    # start staring at human
     async def startStare(self):
         await self._robot.play_anim("anim_meetcozmo_lookface_getin").wait_for_completed()
 
+    # event handler to update observed face
     async def seeFacePosition(self, newPosition: cozmo.util.Position, face: cozmo.faces.Face):
         if self._trackingFace and self._trackingFace == face:
             if self._facePosition:
-                #TODO: check face movement distance
+                # check face movement distance
                 dist2 = Common.wocmath.distance2(newPosition, self._facePosition)
                 self._facePosition = Common.wocmath.running_average_pos(self._facePosition, newPosition, UPDATING_FACTOR)
-                # print("Squared distance: ", dist2)
+
                 if dist2 > DISTRACTION_DISTANCE2_THRS:
                     self._faceMoved = True
                 else:
+                    # face not moved much, start forgiving previous distraction
                     self._forgiveness += 1
                     
             else:
@@ -51,11 +57,13 @@ class Supervisor:
         elif not self._trackingFace:
             self._trackingFace = face
 
+    # called by face disappear event handler
     async def clearFace(self, face: cozmo.faces.Face):
         if self._trackingFace and self._trackingFace == face:
             self._trackingFace = None
             self._facePosition = None
 
+    # called by face appear event handler
     async def seeFace(self, position: cozmo.util.Position, face: cozmo.faces.Face):
         if not self._trackingFace:
             self._trackinFace = face
@@ -77,7 +85,7 @@ class Supervisor:
             self._facePosition = None
             self._faceMoved = False
             
-
+    # find cooresponding angriness level
     async def classifyAngriness(self):
         for i in range(1, len(ANGRY_SCALE)):
             if self._distractionCount <  ANGRY_SCALE[i]:
@@ -85,7 +93,7 @@ class Supervisor:
                 break
             
             
-
+    # Cozmo reacts to human's distraction
     async def distractionReaction(self):
         # determine action based on angry state
         if not self._robot.has_in_progress_actions:
